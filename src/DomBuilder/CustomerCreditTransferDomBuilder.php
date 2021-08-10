@@ -33,7 +33,6 @@ use Digitick\Sepa\TransferInformation\TransferInformationInterface;
  */
 class CustomerCreditTransferDomBuilder extends BaseDomBuilder
 {
-
     function __construct(string $painFormat = 'pain.001.002.03', $withSchemaLocation = true)
     {
         parent::__construct($painFormat, $withSchemaLocation);
@@ -69,20 +68,26 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
             $this->createElement('CtrlSum', $this->intToCurrency($paymentInformation->getControlSumCents()))
         );
 
+        $lhvPaymentMethod = $paymentInformation->getLhvPaymentMethod();
+        if ($lhvPaymentMethod !== null) {
+            $this->addLhvPaymentMethod($lhvPaymentMethod, $this->currentPayment);
+        }
+
         $paymentTypeInformation = $this->createElement('PmtTpInf');
         if ($paymentInformation->getInstructionPriority()) {
             $instructionPriority = $this->createElement('InstrPrty', $paymentInformation->getInstructionPriority());
             $paymentTypeInformation->appendChild($instructionPriority);
         }
-        $serviceLevel = $this->createElement('SvcLvl');
-        $serviceLevel->appendChild($this->createElement('Cd', 'SEPA'));
-        $paymentTypeInformation->appendChild($serviceLevel);
+
         if ($paymentInformation->getCategoryPurposeCode()) {
             $categoryPurpose = $this->createElement('CtgyPurp');
             $categoryPurpose->appendChild($this->createElement('Cd', $paymentInformation->getCategoryPurposeCode()));
             $paymentTypeInformation->appendChild($categoryPurpose);
         }
-        $this->currentPayment->appendChild($paymentTypeInformation);
+
+        if ($paymentTypeInformation->hasChildNodes()) {
+            $this->currentPayment->appendChild($paymentTypeInformation);
+        }
 
         if ($paymentInformation->getLocalInstrumentCode()) {
             $localInstrument = $this->createElement('LclInstr');
@@ -119,6 +124,17 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
 
         $this->currentPayment->appendChild($this->createElement('ChrgBr', 'SLEV'));
         $this->currentTransfer->appendChild($this->currentPayment);
+    }
+
+    private function addLhvPaymentMethod(string $paymentMethod, \DOMElement $groupHeaderTag): void
+    {
+        $paymentTypeInfo = $this->createElement('PmtTpInf');
+        $serviceLevel = $this->createElement('SvcLvl');
+        $proprietary = $this->createElement('Prtry', $paymentMethod);
+
+        $serviceLevel->appendChild($proprietary);
+        $paymentTypeInfo->appendChild($serviceLevel);
+        $groupHeaderTag->appendChild($paymentTypeInfo);
     }
 
     /**

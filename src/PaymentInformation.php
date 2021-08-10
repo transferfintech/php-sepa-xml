@@ -29,6 +29,25 @@ use Digitick\Sepa\Util\StringHelper;
 
 class PaymentInformation
 {
+    public const LHV_PAYMENT_METHODS = [
+        'INST' => 'INST',
+        'SEPA' => 'SEPA',
+        'FAST' => 'FAST',
+        'ALL'  => 'ALL',
+    ];
+
+    /**
+     * @var string|null LHV Payment method.
+     * <ul>
+     * <li><b>INST</b> - SEPA Instant Payment / SCTInst</li>
+     * <li><b>SEPA</b> - SEPA Payment / SCT</li>
+     * <li><b>FAST</b> - UK Faster Payment / FPS</li>
+     * <li><b>ALL</b> - automatic selection, the same outcome as not providing the tag at all.
+     * Can also be used to select SWIFT payments</li>
+     * </ul>
+     */
+    protected $lhvPaymentMethod = null;
+
     /**
      * The first drawn from several recurring debits
      */
@@ -180,6 +199,30 @@ class PaymentInformation
         $this->transfers[] = $transfer;
         $this->numberOfTransactions++;
         $this->controlSumCents += $transfer->getTransferAmount();
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public function setLhvPaymentMethod(string $method): void
+    {
+        $method = strtoupper($method);
+        if (!in_array(
+            $method,
+            array_values(self::LHV_PAYMENT_METHODS)
+        )) {
+            throw new InvalidArgumentException(sprintf(
+                'Invalid LHV Payment Method: %s, must be one of %s',
+                $method,
+                implode(',', $this->validLhvPaymentMethods)
+            ));
+        }
+        $this->lhvPaymentMethod = $method;
+    }
+
+    public function getLhvPaymentMethod(): ?string
+    {
+        return $this->lhvPaymentMethod;
     }
 
     /**
