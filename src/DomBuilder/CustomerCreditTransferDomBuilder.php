@@ -122,7 +122,7 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
         $debtorAgent->appendChild($financialInstitutionId);
         $this->currentPayment->appendChild($debtorAgent);
 
-        $this->currentPayment->appendChild($this->createElement('ChrgBr', 'SLEV'));
+        $this->currentPayment->appendChild($this->createElement('ChrgBr', 'DEBT'));
         $this->currentTransfer->appendChild($this->currentPayment);
     }
 
