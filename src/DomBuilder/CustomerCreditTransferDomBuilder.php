@@ -33,7 +33,6 @@ use Digitick\Sepa\TransferInformation\TransferInformationInterface;
  */
 class CustomerCreditTransferDomBuilder extends BaseDomBuilder
 {
-
     function __construct(string $painFormat = 'pain.001.002.03', $withSchemaLocation = true)
     {
         parent::__construct($painFormat, $withSchemaLocation);
@@ -69,20 +68,26 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
             $this->createElement('CtrlSum', $this->intToCurrency($paymentInformation->getControlSumCents()))
         );
 
+        $lhvPaymentMethod = $paymentInformation->getLhvPaymentMethod();
+        if ($lhvPaymentMethod !== null) {
+            $this->addLhvPaymentMethod($lhvPaymentMethod, $this->currentPayment);
+        }
+
         $paymentTypeInformation = $this->createElement('PmtTpInf');
         if ($paymentInformation->getInstructionPriority()) {
             $instructionPriority = $this->createElement('InstrPrty', $paymentInformation->getInstructionPriority());
             $paymentTypeInformation->appendChild($instructionPriority);
         }
-        $serviceLevel = $this->createElement('SvcLvl');
-        $serviceLevel->appendChild($this->createElement('Cd', 'SEPA'));
-        $paymentTypeInformation->appendChild($serviceLevel);
+
         if ($paymentInformation->getCategoryPurposeCode()) {
             $categoryPurpose = $this->createElement('CtgyPurp');
             $categoryPurpose->appendChild($this->createElement('Cd', $paymentInformation->getCategoryPurposeCode()));
             $paymentTypeInformation->appendChild($categoryPurpose);
         }
-        $this->currentPayment->appendChild($paymentTypeInformation);
+
+        if ($paymentTypeInformation->hasChildNodes()) {
+            $this->currentPayment->appendChild($paymentTypeInformation);
+        }
 
         if ($paymentInformation->getLocalInstrumentCode()) {
             $localInstrument = $this->createElement('LclInstr');
@@ -117,8 +122,19 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
         $debtorAgent->appendChild($financialInstitutionId);
         $this->currentPayment->appendChild($debtorAgent);
 
-        $this->currentPayment->appendChild($this->createElement('ChrgBr', 'SLEV'));
+        $this->currentPayment->appendChild($this->createElement('ChrgBr', 'DEBT'));
         $this->currentTransfer->appendChild($this->currentPayment);
+    }
+
+    private function addLhvPaymentMethod(string $paymentMethod, \DOMElement $groupHeaderTag): void
+    {
+        $paymentTypeInfo = $this->createElement('PmtTpInf');
+        $serviceLevel = $this->createElement('SvcLvl');
+        $proprietary = $this->createElement('Prtry', $paymentMethod);
+
+        $serviceLevel->appendChild($proprietary);
+        $paymentTypeInfo->appendChild($serviceLevel);
+        $groupHeaderTag->appendChild($paymentTypeInfo);
     }
 
     /**
@@ -148,10 +164,34 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
         $CdtTrfTxInf->appendChild($amount);
 
         //Creditor Agent 2.77
-        if ($transactionInformation->getBic()) {
+        $bic = $transactionInformation->getBic();
+        $bankName = $transactionInformation->getBankName();
+        $bankCountry = $transactionInformation->getBankCountry();
+        $bankPostalAddress = $transactionInformation->getBankPostalAddress();
+
+        if (
+            $bic ||
+            $bankName ||
+            $bankCountry ||
+            $bankPostalAddress
+        ) {
             $creditorAgent = $this->createElement('CdtrAgt');
             $financialInstitution = $this->createElement('FinInstnId');
-            $financialInstitution->appendChild($this->createElement('BIC', $transactionInformation->getBic()));
+
+            if ($bic) {
+                $financialInstitution->appendChild($this->createElement('BIC', $bic));
+            }
+
+            if ($bankName) {
+                $financialInstitution->appendChild($this->createElement('Nm', $bankName));
+            }
+
+            $this->appendAddressToDomElement(
+                $financialInstitution,
+                $bankCountry,
+                $bankPostalAddress
+            );
+
             $creditorAgent->appendChild($financialInstitution);
             $CdtTrfTxInf->appendChild($creditorAgent);
         }
@@ -162,7 +202,11 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
 
         // Creditor address if needed and supported by schema.
         if (in_array($this->painFormat, array('pain.001.001.03'))) {
-            $this->appendAddressToDomElement($creditor, $transactionInformation);
+            $this->appendAddressToDomElement(
+                $creditor,
+                $transactionInformation->getCountry(),
+                $transactionInformation->getPostalAddress()
+            );
         }
 
         $CdtTrfTxInf->appendChild($creditor);
@@ -242,30 +286,33 @@ class CustomerCreditTransferDomBuilder extends BaseDomBuilder
      * Appends an address node to the passed dom element containing country and unstructured address lines.
      * Does nothing if no address exists in $transactionInformation.
      */
-    protected function appendAddressToDomElement(\DOMElement $creditor, CustomerCreditTransferInformation $transactionInformation): void
+    protected function appendAddressToDomElement(
+        \DOMElement $element,
+        ?string $country,
+        $address
+    ): void
     {
-        if (!$transactionInformation->getCountry() && !$transactionInformation->getPostalAddress()) {
-            return; // No address exists, nothing to do.
+        if (
+            !$country &&
+            !$address
+        ) {
+            return;
         }
 
         $postalAddress = $this->createElement('PstlAdr');
 
-        // Gemerate country address node.
-        if ((bool)$transactionInformation->getCountry()) {
-            $postalAddress->appendChild($this->createElement('Ctry', $transactionInformation->getCountry()));
+        if ($country) {
+            $postalAddress->appendChild($this->createElement('Ctry', $country));
         }
 
-        // Ensure $postalAddressData is an array as getPostalAddress() returns either string or string[].
-        $postalAddressData = $transactionInformation->getPostalAddress();
-        if (!is_array($postalAddressData)) {
-            $postalAddressData = array($postalAddressData);
+        if (!is_array($address)) {
+            $address = array($address);
         }
 
-        // Generate nodes for each address line.
-        foreach (array_filter($postalAddressData) as $postalAddressLine) {
-            $postalAddress->appendChild($this->createElement('AdrLine', $postalAddressLine));
+        foreach (array_filter($address) as $addressLine) {
+            $postalAddress->appendChild($this->createElement('AdrLine', $addressLine));
         }
 
-        $creditor->appendChild($postalAddress);
+        $element->appendChild($postalAddress);
     }
 }

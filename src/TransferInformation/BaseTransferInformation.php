@@ -101,6 +101,21 @@ class BaseTransferInformation implements TransferInformationInterface
     protected $postalAddress;
 
     /**
+     * @var string|null
+     */
+    protected $bankName;
+
+    /**
+     * @var string|null
+     */
+    protected $bankCountry;
+
+    /**
+     * @var string|string[]|null
+     */
+    protected $bankPostalAddress;
+
+    /**
      * @param int $amount amount in cents
      */
     public function __construct(int $amount, string $iban, string $name, ?string $identification = null)
@@ -224,5 +239,53 @@ class BaseTransferInformation implements TransferInformationInterface
     public function setPostalAddress($postalAddress): void
     {
         $this->postalAddress = $postalAddress;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getBankName(): ?string
+    {
+        return $this->bankName;
+    }
+
+    /**
+     * @param string|null $bankName
+     */
+    public function setBankName(?string $bankName): void
+    {
+        $this->bankName = $bankName;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getBankCountry(): ?string
+    {
+        return $this->bankCountry;
+    }
+
+    /**
+     * @param string|null $bankCountry
+     */
+    public function setBankCountry(?string $bankCountry): void
+    {
+        $this->bankCountry = $bankCountry;
+    }
+
+    /**
+     * @return string|string[]|null
+     */
+    public function getBankPostalAddress()
+    {
+        return $this->bankPostalAddress;
+    }
+
+    /**
+     * @param string|string[]|null $bankPostalAddress
+     */
+    public function setBankPostalAddress($bankPostalAddress): void
+    {
+        $this->bankPostalAddress = $bankPostalAddress;
     }
 }
